@@ -4,7 +4,7 @@
 
 # 1、基于linux系统安装flask、nginx、gunicorn
 ```
-apt-get update
+sudo apt-get update
 sudo apt-get install nginx
 sudo pip3 install Flask
 sudo pip3 install gunicorn
