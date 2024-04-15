@@ -6,6 +6,7 @@
 ```
 sudo apt-get update
 sudo apt-get install nginx
+sudo systemctl start nginx
 sudo pip3 install Flask
 sudo pip3 install gunicorn
 ```
