@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件管理系统</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        body {
+            background: url('https://cdn.pixabay.com/photo/2018/08/14/13/23/ocean-3605547_1280.jpg') no-repeat;
+            background-size: cover;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            width: 90%;
+            max-width: 1200px;
+            padding: 20px;
+            background-color: #00000060;
+            border-radius: 10px;
+        }
+        .module {
+            background-color: #ffffff20;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            overflow: hidden;
+        }
+        h2 {
+            color: #ffffff90;
+            margin-top: 0;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+            text-align: center;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        li {
+            display: block;
+            margin: 10px 0;
+            cursor: pointer;
+            color: #fff;
+            text-align: center;
+        }
+        .file-icon {
+            width: 30px;
+            height: 30px;
+            background-color: #fff;
+            border-radius: 5px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+        }
+        .file-name {
+            margin-top: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+        form {
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ffffff90;
+        }
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #ffffff20;
+            color: #fff;
+        }
+        select option {
+            background-color: #ccc;
+            color: #000;
+        }
+        input[type="file"] {
+            width: 95%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background-color: #ffffff20;
+            color: #fff;
+        }
+        input[type="submit"] {
+            background-image: linear-gradient(to right, #30cfd0, #330867);
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+        progress {
+            /* 重置默认外观 */
+            -webkit-appearance: none;
+            appearance: none;
+            display: none;
+            margin-top: 10px;
+            width: 100%;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+
+            /* 设置进度条的背景颜色 */
+            background-color: #9b9b9b;
+        }
+
+        /* Webkit 浏览器样式 */
+        progress::-webkit-progress-bar {
+            background-color: #9b9b9b; /* 进度条背景色 */
+        }
+
+        progress::-webkit-progress-value {
+            background-color: #2599c6; /* 进度条填充色 */
+        }
+
+        /* Firefox 浏览器样式 */
+        progress::-moz-progress-bar {
+            background-color: #2599c6; /* 进度条填充色 */
+        }
+
+        /* IE11 and Edge 浏览器样式 */
+        progress {
+            background-color: #9b9b9b; /* IE11/Edge 进度条背景色 */
+        }
+
+        progress::-ms-fill {
+            background-color: #2599c6; /* IE11/Edge 进度条填充色 */
+            border: none; /* 移除边框 */
+        }
+        .status {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .success {
+            color: #79cbfd;
+        }
+        .error {
+            color: #fa8b8b;
+        }
+        .working {
+            color: #cacaca;
+        }
+        
+        @media screen and (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            ul {
+                max-height: 150px;
+            }
+            .file-name {
+                max-width: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="module">
+            <h2>Store文件夹内容</h2>
+            <ul id="file-list">
+                {% for item in store_contents %}
+                    <li>
+                        <div class="file-icon">📄</div>
+                        <div class="file-name" title="{{ item }}">{{ item[:30] }}...</div>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="module">
+            <h2>删除文件</h2>
+            <form action="{{ url_for('delfile') }}" method="post">
+                <select id="filename" name="filename">
+                    {% for item in store_contents %}
+                        <option value="{{ item }}">{{ item }}</option>
+                    {% endfor %}
+                </select>
+                <input type="submit" value="删除">
+            </form>
+            <div class="status">
+                {% if del_status == 'success' %}
+                    <span class="success">文件删除成功</span>
+                {% elif del_status == 'error' %}
+                    <span class="error">文件删除失败</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="module">
+            <h2>上传文件</h2>
+            <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+                <input type="file" name="file">
+                <input type="submit" value="上传">
+            </form>
+            <div class="status">
+                {% if upload_status == 'success' %}
+                    <span class="success">文件上传成功</span>
+                {% elif upload_status == 'error' %}
+                    <span class="error">文件上传失败</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="module">
+            <h2>下载文件</h2>
+            <form action="{{ url_for('download') }}" method="post">
+                <select id="downloadFile" name="filename">
+                    {% for item in store_contents %}
+                        <option value="{{ item }}">{{ item }}</option>
+                    {% endfor %}
+                </select>
+                <input type="submit" value="下载" id="download">
+            </form>
+            <div class="status">
+                {% if download_status == 'success' %}
+                    <span class="success">文件删除成功</span>
+                {% elif download_status == 'error' %}
+                    <span class="error">文件删除失败</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="module">
+            <h2>Socket上传文件</h2>
+            <input type="file" id="fileInput">
+            <input type="submit" id="socketuploadSubmit" value="上传">
+            <progress id="SocketuploadProgress" value="10" max="100"></progress>
+            <div class="status">
+                <span class="working" id="up_resttime"></span>
+                {% if socketupload_status == 'success' %}
+                    <span class="success">文件上传成功</span>
+                {% elif socketupload_status == 'error' %}
+                    <span class="error">文件上传失败</span>
+                {% endif %}
+            </div>
+            <script>
+                document.getElementById('socketuploadSubmit').addEventListener('click', function(event) {
+                    event.preventDefault();
+                    const socket = io.connect(`http://${window.location.host}`); // 确保地址和端口与服务器匹配
+                    
+                    const resttime= document.getElementById('up_resttime')
+                    const progress = document.getElementById('SocketuploadProgress');
+                    const fileInput = document.getElementById('fileInput');
+                    const file = fileInput.files[0];
+                    const CHUNK_SIZE = 512 * 1024;
+                    const id = Date.now();
+                    let start_time = Date.now();
+                    let rest_time = 0;
+                    let offset = 0;
+                    let last_Bytes = 0;
+
+                    const readSlice = o => {
+                        offset = o;
+                        const reader = new FileReader();
+
+                        reader.onload = e => {
+                            socket.emit('file_upload', {
+                                filename: file.name,
+                                size: file.size,
+                                data: e.target.result,
+                                file_id: id
+                            });
+
+                            last_Bytes = e.target.result.byteLength;
+                        };
+                        
+
+                        // 注意这里我们使用o作为slice的开始位置
+                        const slice = file.slice(o, o + CHUNK_SIZE);
+                        reader.readAsArrayBuffer(slice);
+                    };
+
+                    if (file) {
+                        start_time = Date.now();
+                        progress.style.display = 'block'; 
+                        progress.value = 0;
+                        resttime.textContent = `文件在上传，剩余 s`; 
+                        readSlice(offset);
+                    } else {
+                        alert('未选择文件！');
+                    }
+
+                    socket.on('send_again', function(data) {
+                        progress.value = (offset + last_Bytes) / file.size * 100;
+                        rest_time = (Date.now() - start_time) * (file.size - offset - last_Bytes) / (offset + last_Bytes);
+                        resttime.textContent = `文件在上传，剩余${(rest_time / 1000).toFixed(2)}s`;
+                        if (offset + last_Bytes < file.size) {
+                            readSlice(offset + CHUNK_SIZE);
+                        }
+                    });
+
+                    socket.on('socketupload', function(data) {
+                        // 假设 data.params 是一个对象，包含了您想要发送的参数
+                        var params = new URLSearchParams({status: data.status}).toString();
+
+                        // 构建完整的URL，包含查询参数
+                        var urlWithParams = data.url + '?' + params;
+
+                        socket.disconnect();
+
+                        // 重定向到新的URL
+                        window.location = urlWithParams;
+                    });
+                });
+            </script>
+        </div>
+        <div class="module">
+            <h2>Socket下载文件</h2>
+            <select id="SocketdownloadFile" name="filename">
+                {% for item in store_contents %}
+                    <option value="{{ item }}">{{ item }}</option>
+                {% endfor %}
+            </select>
+            <input type="submit" id="socketdownloadSubmit" value="下载">
+            <progress id="SocketdownloadProgress" value="10" max="100"></progress>
+            <div class="status">
+                <span class="working" id="down_resttime"></span>
+                {% if socketdownload_status == 'success' %}
+                    <span class="success">文件下载成功</span>
+                {% elif socketdownload_status == 'error' %}
+                    <span class="error">文件下载失败</span>
+                {% endif %}
+            </div>
+            <script>
+                document.getElementById('socketdownloadSubmit').addEventListener('click', function(event) {
+                    event.preventDefault();
+                    const resttime= document.getElementById('down_resttime')
+                    const progress = document.getElementById('SocketdownloadProgress');
+                    const socket = io.connect(`http://${window.location.host}`); // 确保地址和端口与服务器匹配
+                    const filename = document.getElementById('SocketdownloadFile').value;
+                    let start_time = Date.now();
+                    let filedata = [];
+                    //检查filename是否为空
+                    if (filename){
+                        start_time = Date.now();
+                        progress.style.display = 'block';
+                        progress.value = 0;
+                        resttime.textContent = `文件在下载，剩余 s`;
+                        socket.emit('file_download', {filename: filename});
+                    }else{
+                        alert('未选择文件！');
+                    }
+
+                    socket.on('receive', function(data) {
+                        filedata.push(data.data);
+                        if (data.all_read) {
+                            const blob = new Blob(filedata, { type: 'application/octet-stream' });
+                            const downloadLink = document.createElement('a');
+                            downloadLink.href = window.URL.createObjectURL(blob);
+                            downloadLink.download = filename;
+                            downloadLink.style.display = 'none';
+                            document.body.appendChild(downloadLink);
+                            downloadLink.click();
+                            document.body.removeChild(downloadLink);
+                            filedata = []; // 重置数据数组
+
+
+                            var params = new URLSearchParams({status: 'success'}).toString();
+                            var urlWithParams = data.url + '?' + params;
+                            socket.disconnect();
+                            window.location = urlWithParams;
+                        }else{
+                            progress.value = data.readsize / data.filesize * 100;
+                            rest_time = (Date.now() - start_time) * (data.filesize - data.readsize) / data.readsize;
+                            resttime.textContent = `文件在下载，剩余${(rest_time / 1000).toFixed(2)}s`;
+                            socket.emit('file_download', {filename: filename});
+                        }
+                    });
+
+                });
+
+            </script>
+        </div>
+        <div class="module">
+            <h2>web终端</h2>
+            <form onsubmit="return openWebTerminal();">
+                <input type="submit" value="连接webterminal">
+            </form>
+
+            <script>
+                function openWebTerminal() {
+                    window.open('/webterminal', '_blank');
+                    return false; // 阻止表单的默认提交行为
+                }
+            </script>
+        </div>
+
+    </div>
+</body>
+</html>

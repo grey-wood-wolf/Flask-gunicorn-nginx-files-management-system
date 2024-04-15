@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <title>Web Terminal</title>
+</head>
+
+<body>
+    <div id="terminal"></div>
+    <script>
+        let height = document.documentElement.clientHeight;
+        let rows = height/18;//18是字体高度,根据需要自己修改
+        let term = new Terminal({
+            rows:parseInt(rows),
+            cursorBlink: true, // 光标闪烁
+        });
+        term.open(document.getElementById('terminal')); // 将终端附加到DOM元素
+
+        // ANSI escape code for setting text color to bright green and bold
+        const brightGreenBoldText = '\x1b[1m\x1b[92m'; // 1m for bold, 92m for bright green
+        // ANSI escape code for resetting the color and bold
+        const resetColorBold = '\x1b[0m';
+        term.write(`${brightGreenBoldText}Welcome to Web Terminal!${resetColorBold}\r\n`);
+
+        const socket = io(`http://${window.location.host}`);
+        socket.emit('terminal_init');
+
+        term.onData((data) => {
+            socket.emit('terminal_input', {input: data});
+        });
+
+        socket.on('terminal_output', function(data) {
+            if (data.output) {
+                term.write(data.output);
+            }
+        });
+    </script>
+</body>
+
+</html>
